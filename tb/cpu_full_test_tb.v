@@ -6,15 +6,15 @@ module cpu_full_test_tb;
     integer fail_count;
 
     wire [31:0] instr_addr;
-    reg [31:0] instruction;
+    wire [31:0] instruction;
     wire [31:0] data_addr;
     wire [31:0] data_out;
-    reg [31:0] data_in;
+    wire [31:0] data_in;
     wire mem_write;
     wire mem_read;
 
-    reg [31:0] instr_mem [0:255];
-    reg [31:0] data_mem [0:127];
+    localparam INSTR_MEM_DEPTH = 78;
+    localparam DATA_MEM_DEPTH = 128;
 
     cpu cpu_inst(
         .clk(clk),
@@ -28,19 +28,35 @@ module cpu_full_test_tb;
         .mem_read(mem_read)
     );
 
+    bsram #(
+        .DATA_WIDTH(32),
+        .DEPTH(INSTR_MEM_DEPTH),
+        .INIT_FILE("tb/full_instruction_test.hex")
+    ) instr_sram (
+        .clk(clk),
+        .rst(rst),
+        .addr(instr_addr),
+        .data_in(32'b0),
+        .data_out(instruction),
+        .we(1'b0),
+        .re(1'b1)
+    );
+
+    bsram #(
+        .DATA_WIDTH(32),
+        .DEPTH(DATA_MEM_DEPTH)
+    ) data_sram (
+        .clk(clk),
+        .rst(rst),
+        .addr(data_addr),
+        .data_in(data_out),
+        .data_out(data_in),
+        .we(mem_write),
+        .re(mem_read)
+    );
+
     always begin
         #5 clk = ~clk;
-    end
-
-    always @(*) begin
-        instruction = instr_mem[instr_addr[9:2]];
-        if (mem_read)
-            data_in = data_mem[data_addr[7:2]];
-    end
-
-    always @(posedge clk) begin
-        if (mem_write)
-            data_mem[data_addr[7:2]] <= data_out;
     end
 
     initial begin
@@ -68,11 +84,11 @@ module cpu_full_test_tb;
         input [31:0] addr;
         input [31:0] expected;
         begin
-            if (data_mem[addr[7:2]] === expected) begin
+            if (data_sram.mem[addr[7:2]] === expected) begin
                 $display("PASS: %0s Mem[%0d] = %0d", name, addr, expected);
                 pass_count = pass_count + 1;
             end else begin
-                $display("FAIL: %0s Mem[%0d] = %0d, got %0d", name, addr, expected, data_mem[addr[7:2]]);
+                $display("FAIL: %0s Mem[%0d] = %0d, got %0d", name, addr, expected, data_sram.mem[addr[7:2]]);
                 fail_count = fail_count + 1;
             end
         end
@@ -84,90 +100,8 @@ module cpu_full_test_tb;
         pass_count = 0;
         fail_count = 0;
 
-        for (i = 0; i < 256; i = i + 1)
-            instr_mem[i] = 32'h0;
-        for (i = 0; i < 128; i = i + 1)
-            data_mem[i] = 32'h0;
-
-        // Generated from full_instruction_test.s via risc_assembler.py
-        instr_mem[0]  = 32'h0ff00093;
-        instr_mem[1]  = 32'h00a00113;
-        instr_mem[2]  = 32'hfff00193;
-        instr_mem[3]  = 32'h00208233;
-        instr_mem[4]  = 32'h402082b3;
-        instr_mem[5]  = 32'h0020f333;
-        instr_mem[6]  = 32'h0020e3b3;
-        instr_mem[7]  = 32'h0020c433;
-        instr_mem[8]  = 32'h00300513;
-        instr_mem[9]  = 32'h00a094b3;
-        instr_mem[10] = 32'h00200513;
-        instr_mem[11] = 32'h00a0d5b3;
-        instr_mem[12] = 32'h00500513;
-        instr_mem[13] = 32'h40a1d633;
-        instr_mem[14] = 32'h001126b3;
-        instr_mem[15] = 32'h00500793;
-        instr_mem[16] = 32'h0027b733;
-        instr_mem[17] = 32'h00710813;
-        instr_mem[18] = 32'h00f0f893;
-        instr_mem[19] = 32'h02016913;
-        instr_mem[20] = 32'h00a14993;
-        instr_mem[21] = 32'h06412a13;
-        instr_mem[22] = 32'h00513a93;
-        instr_mem[23] = 32'h00409b13;
-        instr_mem[24] = 32'h0040db93;
-        instr_mem[25] = 32'h4081dc13;
-        instr_mem[26] = 32'h00402023;
-        instr_mem[27] = 32'h00502223;
-        instr_mem[28] = 32'h00002d03;
-        instr_mem[29] = 32'h00402d83;
-        instr_mem[30] = 32'h00001e37;
-        instr_mem[31] = 32'h00001e97;
-        instr_mem[32] = 32'h00000f13;
-        instr_mem[33] = 32'h00208463;
-        instr_mem[34] = 32'h001f0f13;
-        instr_mem[35] = 32'h00209663;
-        instr_mem[36] = 32'h00af0f13;
-        instr_mem[37] = 32'h0080006f;
-        instr_mem[38] = 32'h002f0f13;
-        instr_mem[39] = 32'h00114663;
-        instr_mem[40] = 32'h00af0f13;
-        instr_mem[41] = 32'h0080006f;
-        instr_mem[42] = 32'h004f0f13;
-        instr_mem[43] = 32'h0020d663;
-        instr_mem[44] = 32'h00af0f13;
-        instr_mem[45] = 32'h0080006f;
-        instr_mem[46] = 32'h008f0f13;
-        instr_mem[47] = 32'h00116663;
-        instr_mem[48] = 32'h00af0f13;
-        instr_mem[49] = 32'h0080006f;
-        instr_mem[50] = 32'h010f0f13;
-        instr_mem[51] = 32'h0020f663;
-        instr_mem[52] = 32'h00af0f13;
-        instr_mem[53] = 32'h0080006f;
-        instr_mem[54] = 32'h020f0f13;
-        instr_mem[55] = 32'h00109463;
-        instr_mem[56] = 32'h040f0f13;
-        instr_mem[57] = 32'h0020c463;
-        instr_mem[58] = 32'h080f0f13;
-        instr_mem[59] = 32'h00108663;
-        instr_mem[60] = 32'h00af0f13;
-        instr_mem[61] = 32'h0040006f;
-        instr_mem[62] = 32'h0021d463;
-        instr_mem[63] = 32'h100f0f13;
-        instr_mem[64] = 32'h0021e463;
-        instr_mem[65] = 32'h200f0f13;
-        instr_mem[66] = 32'h00317463;
-        instr_mem[67] = 32'h400f0f13;
-        instr_mem[68] = 32'h00800fef;
-        instr_mem[69] = 32'h3e8f0f13;
-        instr_mem[70] = 32'h00000c97;
-        instr_mem[71] = 32'h010c8c93;
-        instr_mem[72] = 32'h000c8fe7;
-        instr_mem[73] = 32'h3e8f0f13;
-        instr_mem[74] = 32'h00000c93;
-        instr_mem[75] = 32'h004ca023;
-        instr_mem[76] = 32'h005ca223;
-        instr_mem[77] = 32'h0000006f;
+        for (i = 0; i < DATA_MEM_DEPTH; i = i + 1)
+            data_sram.mem[i] = 32'h0;
 
         // Apply reset
         #10 rst = 0;
