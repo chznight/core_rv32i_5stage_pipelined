@@ -1,9 +1,9 @@
 module bsram #(
-    parameter int DATA_WIDTH = 32,
-    parameter int DEPTH      = 1024,
+    parameter DATA_WIDTH = 32,
+    parameter DEPTH      = 1024,
 
     // Optional init file. Example: "program.hex"
-    parameter string INIT_FILE = ""
+    parameter INIT_FILE = ""
 )(
     input  wire                  clk,
     input  wire                  rst,
@@ -16,7 +16,16 @@ module bsram #(
     input  wire                  re
 );
 
-    localparam int ADDR_WIDTH = $clog2(DEPTH);
+    function integer clog2;
+        input integer value;
+        begin
+            value = value - 1;
+            for (clog2 = 0; value > 0; clog2 = clog2 + 1)
+                value = value >> 1;
+        end
+    endfunction
+
+    localparam ADDR_WIDTH = clog2(DEPTH);
 
     reg [DATA_WIDTH-1:0] mem [0:DEPTH-1];
     reg [ADDR_WIDTH-1:0] read_addr;
@@ -45,6 +54,8 @@ module bsram #(
         end
     end
 
+    // Gowin BSRAM bypass mode: the read address is registered, but the
+    // memory output is not passed through the optional output pipeline register.
     assign data_out = mem[read_addr];
 
 endmodule
