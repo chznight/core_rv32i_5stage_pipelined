@@ -1,10 +1,12 @@
 module cpu_bubble_sort_tb;
+    localparam ARRAY_SIZE = 200;
+    localparam DATA_MEM_WORDS = ARRAY_SIZE + 1;
+
     // Clock and reset
     reg clk;
     reg rst;
     integer i;
     integer sorted = 1;
-    integer seed = 42; // Seed for random number generation
     integer cycle_count;
     reg sort_done_reported;
     // Memory interface
@@ -19,8 +21,8 @@ module cpu_bubble_sort_tb;
     // Instruction memory (ROM)
     reg [31:0] instr_mem [0:127];
     
-    // Data memory (RAM) - Sized to accommodate 128 elements
-    reg [31:0] data_mem [0:127];
+    // Data memory (RAM) - word 0 is length, words 1..ARRAY_SIZE are data
+    reg [31:0] data_mem [0:DATA_MEM_WORDS-1];
     
     // Instantiate the CPU
     cpu cpu_inst(
@@ -80,6 +82,18 @@ module cpu_bubble_sort_tb;
         $dumpvars(0, cpu_bubble_sort_tb);
     end
 
+    function [31:0] pseudo_random_word;
+        input [31:0] index;
+        reg [31:0] value;
+        begin
+            value = index + 32'h9e3779b9;
+            value = value ^ (value << 13);
+            value = value ^ (value >> 17);
+            value = value ^ (value << 5);
+            pseudo_random_word = {16'd0, value[15:0]} + 32'd1;
+        end
+    endfunction
+
     // Test program for bubble sort
     initial begin
         // Initialize signals
@@ -90,8 +104,8 @@ module cpu_bubble_sort_tb;
         // Program will sort an array of integers in memory
         
         // Program logic:
-        // - Memory address 0 contains the length of the array (100)
-        // - Memory addresses 1-100 contain the unsorted array
+        // - Memory address 0 contains the length of the array
+        // - Memory addresses 1..ARRAY_SIZE contain the unsorted array
         // - The sorted array will be in the same locations after execution
         // - Register usage:
         //   x1: array base address (4, after the length word)
@@ -104,16 +118,15 @@ module cpu_bubble_sort_tb;
         //   x9: array base address (constant)
         
         // Load test array into memory
-        data_mem[0] = 32'd100;  // Array length - changed to 50
+        data_mem[0] = ARRAY_SIZE;
         
-        // Generate 50 random elements
-        for (i = 1; i <= 100; i = i + 1) begin
-            // Generate pseudo-random numbers between 1 and 1000
-            data_mem[i] = ($urandom(seed) % 1000) + 1;
+        // Generate the same deterministic pseudo-random elements as the FPGA top
+        for (i = 1; i <= ARRAY_SIZE; i = i + 1) begin
+            data_mem[i] = pseudo_random_word(i);
         end
         
-        $display("Unsorted array (100 elements):");
-        for (i = 0; i < 100; i = i + 1) begin
+        $display("Unsorted array (%0d elements):", ARRAY_SIZE);
+        for (i = 0; i < ARRAY_SIZE; i = i + 1) begin
             $display("data[%0d] = %0d", i, data_mem[i+1]);
         end
 
@@ -189,8 +202,8 @@ module cpu_bubble_sort_tb;
         // Apply reset
         #10 rst = 0;
         
-        // Run simulation for bubble sort with 50 elements
-        #1600000;
+        // Run simulation for bubble sort with ARRAY_SIZE elements
+        #6400000;
 
         if (!sort_done_reported)
             $display("Sort completion not observed before timeout (x20 = %0d)",
@@ -209,7 +222,7 @@ module cpu_bubble_sort_tb;
         $display("...");
         
         // Display last 25 elements
-        for (i = 75; i < 100; i = i + 1) begin
+        for (i = ARRAY_SIZE - 25; i < ARRAY_SIZE; i = i + 1) begin
             $display("data[%0d] = %0d", i, data_mem[i+1]);
         end
         
@@ -217,12 +230,12 @@ module cpu_bubble_sort_tb;
         $display("\nVerification:");
         begin
             sorted = 1;
-            for (i = 1; i < 100; i = i + 1) begin
+            for (i = 1; i < ARRAY_SIZE; i = i + 1) begin
                 if (data_mem[i] > data_mem[i+1]) begin
                     sorted = 0;
                     $display("FAIL: Array not sorted correctly at index %0d (%0d > %0d)", 
                              i-1, data_mem[i], data_mem[i+1]);
-                    i = 50; // Break the loop
+                    i = ARRAY_SIZE; // Break the loop
                 end
             end
             
