@@ -177,7 +177,26 @@ module cpu(
     
     // ID/EX Pipeline Register
     always @(posedge clk or posedge rst) begin
-        if (rst || flush || stall) begin
+        if (rst) begin
+            ID_EX_PC <= 32'b0;
+            ID_EX_Rs1 <= 5'b0;
+            ID_EX_Rs2 <= 5'b0;
+            ID_EX_Rd <= 5'b0;
+            ID_EX_RegR1 <= 32'b0;
+            ID_EX_RegR2 <= 32'b0;
+            ID_EX_Imm <= 32'b0;
+            ID_EX_RegWrite <= 1'b0;
+            ID_EX_ALUSrc <= 1'b0;
+            ID_EX_ALUOp <= 4'b0;
+            ID_EX_MemRead <= 1'b0;
+            ID_EX_MemWrite <= 1'b0;
+            ID_EX_MemtoReg <= 1'b0;
+            ID_EX_Branch <= 1'b0;
+            ID_EX_Jal <= 1'b0;
+            ID_EX_Jalr <= 1'b0;
+            ID_EX_Funct3 <= 3'b0;
+            ID_EX_Auipc <= 1'b0;
+        end else if (flush || stall) begin
             ID_EX_PC <= 32'b0;
             ID_EX_Rs1 <= 5'b0;
             ID_EX_Rs2 <= 5'b0;
@@ -266,7 +285,21 @@ module cpu(
     
     // EX/MEM Pipeline Register
     always @(posedge clk or posedge rst) begin
-        if (rst || flush) begin
+        if (rst) begin
+            EX_MEM_BranchTarget <= 32'b0;
+            EX_MEM_Zero <= 1'b0;
+            EX_MEM_ALUResult <= 32'b0;
+            EX_MEM_RegR2 <= 32'b0;
+            EX_MEM_Rd <= 5'b0;
+            EX_MEM_RegWrite <= 1'b0;
+            EX_MEM_MemRead <= 1'b0;
+            EX_MEM_MemWrite <= 1'b0;
+            EX_MEM_MemtoReg <= 1'b0;
+            EX_MEM_Branch <= 1'b0;
+            EX_MEM_Jal <= 1'b0;
+            EX_MEM_Jalr <= 1'b0;
+            EX_MEM_Funct3 <= 3'b0;
+        end else if (flush) begin
             EX_MEM_BranchTarget <= 32'b0;
             EX_MEM_Zero <= 1'b0;
             EX_MEM_ALUResult <= 32'b0;
