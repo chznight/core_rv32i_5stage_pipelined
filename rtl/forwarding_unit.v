@@ -1,8 +1,10 @@
 module forwarding_unit(
     input wire EX_MEM_RegWrite,
-    input wire MEM_WB_RegWrite,
+    input wire MEM_WB_RegWrite_stage1,
+    input wire MEM_WB_RegWrite_stage2,
     input wire [4:0] EX_MEM_Rd,
-    input wire [4:0] MEM_WB_Rd,
+    input wire [4:0] MEM_WB_Rd_stage1,
+    input wire [4:0] MEM_WB_Rd_stage2,
     input wire [4:0] ID_EX_Rs1,
     input wire [4:0] ID_EX_Rs2,
     output reg [1:0] ForwardA,
@@ -14,10 +16,10 @@ module forwarding_unit(
         if (EX_MEM_RegWrite && (EX_MEM_Rd != 5'b0) && (EX_MEM_Rd == ID_EX_Rs1)) begin
             // Forward from EX/MEM pipeline register
             ForwardA = 2'b10;
-        end
-        else if (MEM_WB_RegWrite && (MEM_WB_Rd != 5'b0) && 
-                 !(EX_MEM_RegWrite && (EX_MEM_Rd != 5'b0) && (EX_MEM_Rd == ID_EX_Rs1)) &&
-                 (MEM_WB_Rd == ID_EX_Rs1)) begin
+        end else if (MEM_WB_RegWrite_stage1 && (MEM_WB_Rd_stage1 != 5'b0) && (MEM_WB_Rd_stage1 == ID_EX_Rs1)) begin
+            // Forward from MEM/WB pipeline register
+            ForwardA = 2'b11;
+        end else if (MEM_WB_RegWrite_stage2 && (MEM_WB_Rd_stage2 != 5'b0) && (MEM_WB_Rd_stage2 == ID_EX_Rs1)) begin
             // Forward from MEM/WB pipeline register
             ForwardA = 2'b01;
         end
@@ -30,10 +32,11 @@ module forwarding_unit(
         if (EX_MEM_RegWrite && (EX_MEM_Rd != 5'b0) && (EX_MEM_Rd == ID_EX_Rs2)) begin
             // Forward from EX/MEM pipeline register
             ForwardB = 2'b10;
+        end else if (MEM_WB_RegWrite_stage1 && (MEM_WB_Rd_stage1 != 5'b0) && (MEM_WB_Rd_stage1 == ID_EX_Rs2)) begin
+            // Forward from MEM/WB pipeline register
+            ForwardB = 2'b11;
         end
-        else if (MEM_WB_RegWrite && (MEM_WB_Rd != 5'b0) && 
-                 !(EX_MEM_RegWrite && (EX_MEM_Rd != 5'b0) && (EX_MEM_Rd == ID_EX_Rs2)) &&
-                 (MEM_WB_Rd == ID_EX_Rs2)) begin
+        else if (MEM_WB_RegWrite_stage2 && (MEM_WB_Rd_stage2 != 5'b0) && (MEM_WB_Rd_stage2 == ID_EX_Rs2)) begin
             // Forward from MEM/WB pipeline register
             ForwardB = 2'b01;
         end

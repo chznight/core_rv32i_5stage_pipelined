@@ -3,7 +3,7 @@
 # OoO-friendly ALU benchmark:
 # - five independent accumulator chains in the loop body
 # - one loop counter branch
-# - final checksum stored to memory[0]
+# - final checksum stored to unified data memory word 0 at byte address 0x400
 # - x20 is set to 1 on completion
 
     addi x1,  x0, 2000   # loop count
@@ -33,7 +33,8 @@ loop:
     add  x25, x14, x16
     add  x26, x18, x24
     add  x27, x25, x26
-    sw   x27, 0(x0)
+    addi x23, x0, 1024
+    sw   x27, 0(x23)
     addi x20, x0, 1
 
 done:

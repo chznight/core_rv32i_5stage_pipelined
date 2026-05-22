@@ -55,10 +55,11 @@
     srai x24, x3, 8
 
     # --- Memory: SW + LW ---
-    sw x4, 0(x0)
-    sw x5, 4(x0)
-    lw x26, 0(x0)
-    lw x27, 4(x0)
+    addi x25, x0, 1024
+    sw x4, 0(x25)
+    sw x5, 4(x25)
+    lw x26, 0(x25)
+    lw x27, 4(x25)
 
     # --- U-type: LUI x28 = 0x1000 = 4096 ---
     lui x28, 4096
@@ -167,7 +168,7 @@ jalr_target:
     # 3 instructions after auipc = jalr_target
 
     # --- Store results ---
-    addi x25, x0, 0
+    addi x25, x0, 1024
     sw x4, 0(x25)
     sw x5, 4(x25)
 

@@ -1,10 +1,10 @@
 module hazard_detection(
     input wire ID_EX_MemRead,
-    input wire MEM_WB_RegWrite,
+    input wire EX_MEM_MemRead,
     input wire [4:0] ID_EX_Rd,
+    input wire [4:0] EX_MEM_Rd,
     input wire [4:0] IF_ID_Rs1,
     input wire [4:0] IF_ID_Rs2,
-    input wire [4:0] MEM_WB_Rd,
     output reg stall
 );
 
@@ -16,9 +16,10 @@ module hazard_detection(
         if (ID_EX_MemRead && 
             ((ID_EX_Rd == IF_ID_Rs1) || (ID_EX_Rd == IF_ID_Rs2)) && 
             (ID_EX_Rd != 0)) begin
-            stall = 1'b1; // Stall the pipeline
-        end
-        else begin
+            stall = 1'b1; // Stall the pipelineß
+        end else if (EX_MEM_MemRead && ((EX_MEM_Rd == IF_ID_Rs1) || (EX_MEM_Rd == IF_ID_Rs2)) && (EX_MEM_Rd != 0)) begin 
+            stall = 1'b1; 
+        end else begin
             stall = 1'b0; // No stall
         end
     end
