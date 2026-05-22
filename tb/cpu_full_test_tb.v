@@ -13,8 +13,7 @@ module cpu_full_test_tb;
     wire mem_write;
     wire mem_read;
 
-    localparam INSTR_MEM_DEPTH = 78;
-    localparam DATA_MEM_DEPTH = 128;
+    localparam DATA_BASE_WORD = 256;
 
     cpu cpu_inst(
         .clk(clk),
@@ -28,31 +27,24 @@ module cpu_full_test_tb;
         .mem_read(mem_read)
     );
 
+    // One dual-port SRAM presents a unified memory image to the CPU.
     bsram #(
         .DATA_WIDTH(32),
-        .DEPTH(INSTR_MEM_DEPTH),
+        .DEPTH(2048),
         .INIT_FILE("tb/full_instruction_test.hex")
-    ) instr_sram (
+    ) block_sram (
         .clk(clk),
         .rst(rst),
-        .addr(instr_addr),
-        .data_in(32'b0),
-        .data_out(instruction),
-        .we(1'b0),
-        .re(1'b1)
-    );
-
-    bsram #(
-        .DATA_WIDTH(32),
-        .DEPTH(DATA_MEM_DEPTH)
-    ) data_sram (
-        .clk(clk),
-        .rst(rst),
-        .addr(data_addr),
-        .data_in(data_out),
-        .data_out(data_in),
-        .we(mem_write),
-        .re(mem_read)
+        .addr_port1(instr_addr),
+        .data_in_port1(32'b0),
+        .data_out_port1(instruction),
+        .we_port1(1'b0),
+        .re_port1(1'b1),
+        .addr_port2(data_addr),
+        .data_in_port2(data_out),
+        .data_out_port2(data_in),
+        .we_port2(mem_write),
+        .re_port2(mem_read)
     );
 
     always begin
@@ -84,11 +76,11 @@ module cpu_full_test_tb;
         input [31:0] addr;
         input [31:0] expected;
         begin
-            if (data_sram.mem[addr[7:2]] === expected) begin
+            if (block_sram.mem[DATA_BASE_WORD + addr[31:2]] === expected) begin
                 $display("PASS: %0s Mem[%0d] = %0d", name, addr, expected);
                 pass_count = pass_count + 1;
             end else begin
-                $display("FAIL: %0s Mem[%0d] = %0d, got %0d", name, addr, expected, data_sram.mem[addr[7:2]]);
+                $display("FAIL: %0s Mem[%0d] = %0d, got %0d", name, addr, expected, block_sram.mem[DATA_BASE_WORD + addr[31:2]]);
                 fail_count = fail_count + 1;
             end
         end
@@ -99,9 +91,6 @@ module cpu_full_test_tb;
         rst = 1;
         pass_count = 0;
         fail_count = 0;
-
-        for (i = 0; i < DATA_MEM_DEPTH; i = i + 1)
-            data_sram.mem[i] = 32'h0;
 
         // Apply reset
         #10 rst = 0;
@@ -142,17 +131,17 @@ module cpu_full_test_tb;
 
         $display("\n--- Upper Immediate Instructions (LUI, AUIPC) ---");
         check_reg("LUI   x28", 28, 32'd4096);
-        // auipc x29, 4096 at addr=124: x29 = 124 + 4096 = 4220
-        check_reg("AUIPC x29", 29, 32'd4220);
+        // auipc x29, 4096 at addr=128: x29 = 128 + 4096 = 4224
+        check_reg("AUIPC x29", 29, 32'd4224);
 
         $display("\n--- Branch Instructions (6) ---");
         // 1+2+4+8+16+32+64+128+0+256+512+1024 = 2047
         check_reg("BRANCH x30", 30, 32'd2047);
 
         $display("\n--- Jump Instructions (JAL, JALR) ---");
-        // JAL at idx=68 (addr=272): x31 = 272+4 = 276
-        // Then JALR at idx=72 (addr=288) overwrites x31 = 288+4 = 292
-        check_reg("JALR x31", 31, 32'd292);
+        // JAL at idx=69 (addr=276): x31 = 276+4 = 280
+        // Then JALR at idx=73 (addr=292) overwrites x31 = 292+4 = 296
+        check_reg("JALR x31", 31, 32'd296);
         // Verify JALR jumped correctly (skipped instr should not execute)
         check_reg("JALR skip (x30)", 30, 32'd2047);
 

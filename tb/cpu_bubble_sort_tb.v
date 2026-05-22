@@ -6,14 +6,12 @@ module cpu_bubble_sort_tb;
     reg rst;
     integer i;
     integer sorted = 1;
-    integer seed = 42; // Seed for random number generation
     integer cycle_count;
     integer finish_cycle;
     reg sort_done_reported;
     localparam DISPLAY_EDGE_COUNT = (ARRAY_LEN < 25) ? ARRAY_LEN : 25;
     localparam TIMEOUT_CYCLES = (ARRAY_LEN * ARRAY_LEN * 100) + 10000;
-    localparam INSTR_MEM_DEPTH = 128;
-    localparam DATA_MEM_DEPTH = ARRAY_LEN + 1;
+    localparam DATA_BASE_WORD = 256;
     // Memory interface
     wire [31:0] instr_addr;
     wire [31:0] instruction;
@@ -36,33 +34,26 @@ module cpu_bubble_sort_tb;
         .mem_read(mem_read)
     );
 
-    // Separate block SRAMs match the CPU's instruction and data memory ports.
+    // One dual-port SRAM presents a unified memory image to the CPU.
     bsram #(
         .DATA_WIDTH(32),
-        .DEPTH(INSTR_MEM_DEPTH),
+        .DEPTH(2048),
         .INIT_FILE("tb/bubble_sort.hex")
-    ) instr_sram (
+    ) block_sram (
         .clk(clk),
         .rst(rst),
-        .addr(instr_addr),
-        .data_in(32'b0),
-        .data_out(instruction),
-        .we(1'b0),
-        .re(1'b1)
+        .addr_port1(instr_addr),
+        .data_in_port1(32'b0),
+        .data_out_port1(instruction),
+        .we_port1(1'b0),
+        .re_port1(1'b1),
+        .addr_port2(data_addr),
+        .data_in_port2(data_out),
+        .data_out_port2(data_in),
+        .we_port2(mem_write),
+        .re_port2(mem_read)
     );
 
-    bsram #(
-        .DATA_WIDTH(32),
-        .DEPTH(DATA_MEM_DEPTH)
-    ) data_sram (
-        .clk(clk),
-        .rst(rst),
-        .addr(data_addr),
-        .data_in(data_out),
-        .data_out(data_in),
-        .we(mem_write),
-        .re(mem_read)
-    );
     
     // Clock generation
     always begin
@@ -106,8 +97,8 @@ module cpu_bubble_sort_tb;
         // Program will sort an array of integers in memory
         
         // Program logic:
-        // - Memory address 0 contains the length of the array
-        // - Memory addresses 1-ARRAY_LEN contain the unsorted array
+        // - Word DATA_BASE_WORD contains the length of the array
+        // - Words DATA_BASE_WORD+1 through DATA_BASE_WORD+ARRAY_LEN contain the unsorted array
         // - The sorted array will be in the same locations after execution
         // - Register usage:
         //   x1: array base address (4, after the length word)
@@ -119,18 +110,13 @@ module cpu_bubble_sort_tb;
         //   x8: array length - 1
         //   x9: array base address (constant)
         
-        // Load test array into memory
-        data_sram.mem[0] = ARRAY_LEN;
-        
-        // Generate random elements
-        for (i = 1; i <= ARRAY_LEN; i = i + 1) begin
-            // Generate pseudo-random numbers between 1 and 1000
-            data_sram.mem[i] = ($urandom(seed) % 1000) + 1;
-        end
+        if (block_sram.mem[DATA_BASE_WORD] != ARRAY_LEN)
+            $display("WARN: array length word is %0d, expected %0d",
+                     block_sram.mem[DATA_BASE_WORD], ARRAY_LEN);
         
         $display("Unsorted array (%0d elements):", ARRAY_LEN);
         for (i = 0; i < ARRAY_LEN; i = i + 1) begin
-            $display("data[%0d] = %0d", i, data_sram.mem[i+1]);
+            $display("data[%0d] = %0d", i, block_sram.mem[DATA_BASE_WORD + i + 1]);
         end
 
         // Apply reset
@@ -155,14 +141,14 @@ module cpu_bubble_sort_tb;
         
         // Display first 25 elements
         for (i = 0; i < DISPLAY_EDGE_COUNT; i = i + 1) begin
-            $display("data[%0d] = %0d", i, data_sram.mem[i+1]);
+            $display("data[%0d] = %0d", i, block_sram.mem[DATA_BASE_WORD + i + 1]);
         end
         
         $display("...");
         
         // Display last 25 elements
         for (i = ARRAY_LEN - DISPLAY_EDGE_COUNT; i < ARRAY_LEN; i = i + 1) begin
-            $display("data[%0d] = %0d", i, data_sram.mem[i+1]);
+            $display("data[%0d] = %0d", i, block_sram.mem[DATA_BASE_WORD + i + 1]);
         end
         
         // Verify the sorting worked by checking if the array is in ascending order
@@ -170,10 +156,12 @@ module cpu_bubble_sort_tb;
         begin
             sorted = 1;
             for (i = 1; i < ARRAY_LEN; i = i + 1) begin
-                if (data_sram.mem[i] > data_sram.mem[i+1]) begin
+                if (block_sram.mem[DATA_BASE_WORD + i] > block_sram.mem[DATA_BASE_WORD + i + 1]) begin
                     sorted = 0;
                     $display("FAIL: Array not sorted correctly at index %0d (%0d > %0d)", 
-                             i-1, data_sram.mem[i], data_sram.mem[i+1]);
+                             i-1,
+                             block_sram.mem[DATA_BASE_WORD + i],
+                             block_sram.mem[DATA_BASE_WORD + i + 1]);
                     i = ARRAY_LEN; // Break the loop
                 end
             end

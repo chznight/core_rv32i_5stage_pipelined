@@ -3,8 +3,10 @@
 # Bubble sort benchmark.
 #
 # Memory layout:
-# - mem[0] contains the array length.
-# - mem[1..n] contains the array elements.
+# - Instructions start at byte address 0x000.
+# - Data starts at byte address 0x400.
+# - mem[0x400 >> 2] contains the array length.
+# - mem[(0x400 >> 2) + 1..n] contains the array elements.
 # - The sorted array is written back in place.
 #
 # Register usage:
@@ -17,8 +19,9 @@
 # - x7: data[j + 1]
 # - x8: n - 1
 # - x20: completion flag
+# - mem[(0x400 >> 2) - 1] is the FPGA completion marker.
 
-    addi x1, x0, 4          # Base address, skipping length word.
+    addi x1, x0, 1028       # Data base + 4, skipping length word.
     lw   x4, -4(x1)         # Load n from mem[0].
     addi x8, x4, -1         # Last sortable index.
     addi x2, x0, 0          # i = 0.
@@ -51,6 +54,7 @@ next_outer:
 
 sort_done:
     addi x20, x0, 1
+    sw   x20, 1020(x0)      # Store completion marker in word before data base.
 
 halt:
     jal  x0, halt

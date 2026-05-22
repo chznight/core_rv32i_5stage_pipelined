@@ -4,7 +4,7 @@ module cpu_fibonacci_tb;
     reg rst;
     integer i;
 
-    localparam integer MEM_DEPTH = 64;
+    localparam DATA_BASE_WORD = 256;
     
     // Memory interface
     wire [31:0] instr_addr;
@@ -28,32 +28,24 @@ module cpu_fibonacci_tb;
         .mem_read(mem_read)
     );
 
-    // Separate instruction/data SRAMs match the CPU's Harvard-style memory ports.
+    // One dual-port SRAM presents a unified memory image to the CPU.
     bsram #(
         .DATA_WIDTH(32),
-        .DEPTH(MEM_DEPTH),
+        .DEPTH(2048),
         .INIT_FILE("tb/fibonacci_0.hex")
-    ) instr_sram (
+    ) block_sram (
         .clk(clk),
         .rst(rst),
-        .addr(instr_addr),
-        .data_in(32'b0),
-        .data_out(instruction),
-        .we(1'b0),
-        .re(1'b1)
-    );
-
-    bsram #(
-        .DATA_WIDTH(32),
-        .DEPTH(MEM_DEPTH)
-    ) data_sram (
-        .clk(clk),
-        .rst(rst),
-        .addr(data_addr),
-        .data_in(data_out),
-        .data_out(data_in),
-        .we(mem_write),
-        .re(mem_read)
+        .addr_port1(instr_addr),
+        .data_in_port1(32'b0),
+        .data_out_port1(instruction),
+        .we_port1(1'b0),
+        .re_port1(1'b1),
+        .addr_port2(data_addr),
+        .data_in_port2(data_out),
+        .data_out_port2(data_in),
+        .we_port2(mem_write),
+        .re_port2(mem_read)
     );
 
     // Clock generation
@@ -83,25 +75,25 @@ module cpu_fibonacci_tb;
         // Display results
         $display("Fibonacci Sequence:");
         for (i = 0; i < 20; i = i + 1) begin
-            $display("Fib[%0d] = %0d", i, data_sram.mem[i]);
+            $display("Fib[%0d] = %0d", i, block_sram.mem[DATA_BASE_WORD + i]);
         end
         
         // The expected Fibonacci sequence starts with 1, 1, 2, 3, 5, 8, 13, 21, 34, 55...
-        if (data_sram.mem[0] == 1 && data_sram.mem[1] == 1 && data_sram.mem[2] == 2 &&
-            data_sram.mem[3] == 3 && data_sram.mem[4] == 5 && data_sram.mem[5] == 8 &&
-            data_sram.mem[6] == 13 && data_sram.mem[7] == 21 && data_sram.mem[8] == 34 &&
-            data_sram.mem[9] == 55 && data_sram.mem[10] == 89 && data_sram.mem[11] == 144 &&
-            data_sram.mem[12] == 233 && data_sram.mem[13] == 377 && data_sram.mem[14] == 610 &&
-            data_sram.mem[15] == 987 && data_sram.mem[16] == 1597 && data_sram.mem[17] == 2584 &&
-            data_sram.mem[18] == 4181 && data_sram.mem[19] == 6765) begin
+        if (block_sram.mem[DATA_BASE_WORD + 0] == 1 && block_sram.mem[DATA_BASE_WORD + 1] == 1 && block_sram.mem[DATA_BASE_WORD + 2] == 2 &&
+            block_sram.mem[DATA_BASE_WORD + 3] == 3 && block_sram.mem[DATA_BASE_WORD + 4] == 5 && block_sram.mem[DATA_BASE_WORD + 5] == 8 &&
+            block_sram.mem[DATA_BASE_WORD + 6] == 13 && block_sram.mem[DATA_BASE_WORD + 7] == 21 && block_sram.mem[DATA_BASE_WORD + 8] == 34 &&
+            block_sram.mem[DATA_BASE_WORD + 9] == 55 && block_sram.mem[DATA_BASE_WORD + 10] == 89 && block_sram.mem[DATA_BASE_WORD + 11] == 144 &&
+            block_sram.mem[DATA_BASE_WORD + 12] == 233 && block_sram.mem[DATA_BASE_WORD + 13] == 377 && block_sram.mem[DATA_BASE_WORD + 14] == 610 &&
+            block_sram.mem[DATA_BASE_WORD + 15] == 987 && block_sram.mem[DATA_BASE_WORD + 16] == 1597 && block_sram.mem[DATA_BASE_WORD + 17] == 2584 &&
+            block_sram.mem[DATA_BASE_WORD + 18] == 4181 && block_sram.mem[DATA_BASE_WORD + 19] == 6765) begin
             $display("PASS: First 20 Fibonacci numbers calculated correctly");
         end else begin
             $display("FAIL: Fibonacci sequence incorrect");
             $display("Expected: 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, ..., 6765");
             $display("Got first 10: %0d, %0d, %0d, %0d, %0d, %0d, %0d, %0d, %0d, %0d...",
-                     data_sram.mem[0], data_sram.mem[1], data_sram.mem[2], data_sram.mem[3], data_sram.mem[4],
-                     data_sram.mem[5], data_sram.mem[6], data_sram.mem[7], data_sram.mem[8], data_sram.mem[9]);
-            $display("Got Fib[19]: %0d", data_sram.mem[19]);
+                     block_sram.mem[DATA_BASE_WORD + 0], block_sram.mem[DATA_BASE_WORD + 1], block_sram.mem[DATA_BASE_WORD + 2], block_sram.mem[DATA_BASE_WORD + 3], block_sram.mem[DATA_BASE_WORD + 4],
+                     block_sram.mem[DATA_BASE_WORD + 5], block_sram.mem[DATA_BASE_WORD + 6], block_sram.mem[DATA_BASE_WORD + 7], block_sram.mem[DATA_BASE_WORD + 8], block_sram.mem[DATA_BASE_WORD + 9]);
+            $display("Got Fib[19]: %0d", block_sram.mem[DATA_BASE_WORD + 19]);
         end
         
         $finish;

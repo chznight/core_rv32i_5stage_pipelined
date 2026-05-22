@@ -2,10 +2,12 @@
 
 # GCD test program.
 #
-# Data memory layout:
-# - mem[0] contains the number of input pairs.
-# - mem[1..10] contains five input pairs.
-# - mem[11..15] receives the GCD results.
+# Unified memory layout:
+# - Instructions start at byte address 0x000.
+# - Data starts at byte address 0x400.
+# - mem[0x400 >> 2] contains the number of input pairs.
+# - mem[(0x400 >> 2) + 1..10] contains five input pairs.
+# - mem[(0x400 >> 2) + 11..15] receives the GCD results.
 #
 # Register usage:
 # - x1: current A value
@@ -15,11 +17,11 @@
 # - x6: processed-pair counter
 # - x7: byte pointer for writing results
 
-    addi x4, x0, 0          # Input pointer starts at mem[0].
+    addi x4, x0, 1024       # Input pointer starts at data mem[0].
     lw   x5, 0(x4)          # Load number of pairs.
     addi x4, x4, 4          # Advance to first input value.
     addi x6, x0, 0          # Processed-pair counter.
-    addi x7, x0, 44         # Result pointer: mem[11].
+    addi x7, x0, 1068       # Result pointer: data mem[11].
 
 process_pair:
     lw   x1, 0(x4)          # Load A.

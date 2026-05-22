@@ -1,11 +1,11 @@
 # Fibonacci sequence calculator
 # Calculate Fibonacci sequence up to 20 iterations
-# Stores results in memory starting at address 0
+# Stores results in unified memory starting at byte address 0x400
 
     # Initialize registers
     addi x1, x0, 1      # x1 = 1 (first fibonacci number)
     addi x2, x0, 1      # x2 = 1 (second fibonacci number)
-    addi x3, x0, 0      # x3 = 0 (memory address counter)
+    addi x3, x0, 1024   # x3 = 0x400 (memory address counter)
     addi x4, x0, 20     # x4 = 20 (number of iterations)
     addi x5, x0, 0      # x5 = 0 (iteration counter)
 
