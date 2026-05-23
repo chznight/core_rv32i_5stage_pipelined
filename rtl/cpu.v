@@ -15,6 +15,8 @@ module cpu(
     // IF/ID
     reg [31:0] IF_ID_PC;
     reg [31:0] IF_ID_Instruction;
+    reg [31:0] IF_ID_predict_branch_target;
+    reg IF_ID_predict_taken;
     
     // ID/EX
     reg [31:0] ID_EX_PC;
@@ -35,6 +37,8 @@ module cpu(
     reg ID_EX_Jal;
     reg ID_EX_Jalr;
     reg ID_EX_Auipc;
+    reg [31:0] ID_EX_predict_branch_target;
+    reg ID_EX_predict_taken;
     
     // EX/MEM
     reg [31:0] EX_MEM_BranchTarget;
@@ -50,6 +54,9 @@ module cpu(
     reg EX_MEM_Branch;
     reg EX_MEM_Jal;
     reg EX_MEM_Jalr;
+    reg [31:0] EX_MEM_PC;
+    reg [31:0] EX_MEM_predict_branch_target;
+    reg EX_MEM_predict_taken;
 
     // MEM/WB
     reg [31:0] MEM_WB_ReadData_stage1;
@@ -65,7 +72,7 @@ module cpu(
     // Internal signals
     // IF stage
     reg [31:0] PC;
-    wire [31:0] PC_next;
+    reg [31:0] PC_next;
     reg [31:0] PC_in_flight;
     reg PC_in_flight_valid;
     wire branch_taken;
@@ -88,7 +95,14 @@ module cpu(
     wire jal;
     wire jalr;
     wire auipc;
-    
+    wire [31:0] predict_branch_target;
+    wire predict_taken;
+    reg [31:0] predict_branch_target_inflight;
+    reg predict_taken_inflight;
+
+    wire branch_predict_missed;
+    wire branch_target_missed;
+
     // Hazard detection unit signals
     wire stall;
     reg flush;
@@ -98,6 +112,8 @@ module cpu(
     
     // Pipeline control signals
     reg pipeline_stall;
+
+    reg [1:0] branch_type;
     
     // Fetch stage (IF)
     assign instr_addr = stall ? PC_in_flight : PC;
@@ -114,18 +130,56 @@ module cpu(
         if (rst) begin
             PC_in_flight <= 32'b0;
             PC_in_flight_valid <= 1'b0;
+            predict_branch_target_inflight <= 32'b0;
+            predict_taken_inflight <= 1'b0;
         end else if (flush) begin
             PC_in_flight <= 32'b0;
             PC_in_flight_valid <= 1'b0;
+            predict_branch_target_inflight <= 32'b0;
+            predict_taken_inflight <= 1'b0;
         end else if (!pipeline_stall) begin
             PC_in_flight <= PC;
             PC_in_flight_valid <= 1'b1;
+            predict_branch_target_inflight <= predict_branch_target;
+            predict_taken_inflight <= predict_taken;
         end
     end
 
-    assign PC_next = branch_taken ? EX_MEM_BranchTarget : PC + 4;
-    //assign branch_taken = (EX_MEM_Branch & EX_MEM_Zero) | (EX_MEM_Branch & (EX_MEM_ALUResult == 32'b1)) | EX_MEM_Jal | EX_MEM_Jalr;
-    // assign branch_taken = (EX_MEM_Branch & EX_MEM_Zero) | (EX_MEM_Branch & (EX_MEM_ALUResult == 32'b1));
+    always @(*) begin
+        if (branch_predict_missed | branch_target_missed) begin
+            if (branch_taken)
+                PC_next = EX_MEM_BranchTarget;
+            else
+                PC_next = EX_MEM_PC + 4;
+        end else begin
+            PC_next = PC + 4;
+        end
+    end
+
+    branch_predictor branch_predictor (
+        .clk(clk),
+        .reset(rst),
+        .pc(PC),
+        .predict_taken(predict_taken),
+        .predict_branch_target(predict_branch_target),
+        .update_predictor_pc(EX_MEM_PC),
+        .update_predictor_branch_target(EX_MEM_BranchTarget),
+        .update_predictor_en(EX_MEM_Branch | EX_MEM_Jal | EX_MEM_Jalr),
+        .update_predictor_taken(branch_taken),
+        .predictor_missed(branch_predict_missed),
+        .predictor_target_missed(branch_target_missed),
+        .instruction_type(branch_type)
+    );
+
+    always @(*) begin
+        if (EX_MEM_Branch)
+            branch_type = 2'b01;
+        else if (EX_MEM_Jal | EX_MEM_Jalr)
+            branch_type = 2'b10;
+        else
+            branch_type = 2'b00;
+    end
+
     assign branch_taken = ((EX_MEM_Branch) & 
                             (((EX_MEM_Funct3 == 3'b000) & (EX_MEM_Zero == 1)) |
                             ((EX_MEM_Funct3 == 3'b001) & (EX_MEM_Zero == 0))  |
@@ -141,13 +195,19 @@ module cpu(
         if (rst) begin
             IF_ID_PC <= 32'b0;
             IF_ID_Instruction <= 32'b0;
+            IF_ID_predict_branch_target <= 32'b0;
+            IF_ID_predict_taken <= 0;
         end else if (!pipeline_stall) begin
             if (flush | !PC_in_flight_valid) begin
                 IF_ID_Instruction <= 32'b0; // NOP on flush
                 IF_ID_PC <= 32'b0;
+                IF_ID_predict_branch_target <= 32'b0;
+                IF_ID_predict_taken <= 0;
             end else begin
                 IF_ID_PC <= PC_in_flight;
                 IF_ID_Instruction <= instruction;
+                IF_ID_predict_branch_target <= predict_branch_target_inflight;
+                IF_ID_predict_taken <= predict_taken_inflight;
             end
         end
     end
@@ -215,6 +275,8 @@ module cpu(
             ID_EX_Jalr <= 1'b0;
             ID_EX_Funct3 <= 3'b0;
             ID_EX_Auipc <= 1'b0;
+            ID_EX_predict_branch_target <= 32'b0;
+            ID_EX_predict_taken <= 0;
         end else if (flush || stall) begin
             ID_EX_PC <= 32'b0;
             ID_EX_Rs1 <= 5'b0;
@@ -234,6 +296,8 @@ module cpu(
             ID_EX_Jalr <= 1'b0;
             ID_EX_Funct3 <= 3'b0;
             ID_EX_Auipc <= 1'b0;
+            ID_EX_predict_branch_target <= 32'b0;
+            ID_EX_predict_taken <= 0;
         end else if (!pipeline_stall) begin
             ID_EX_PC <= IF_ID_PC;
             ID_EX_Rs1 <= IF_ID_Instruction[19:15];
@@ -253,6 +317,8 @@ module cpu(
             ID_EX_Jalr <= jalr;
             ID_EX_Auipc <= auipc;
             ID_EX_Funct3 <= IF_ID_Instruction[14:12];
+            ID_EX_predict_branch_target <= IF_ID_predict_branch_target;
+            ID_EX_predict_taken <= IF_ID_predict_taken;
         end
     end
     
@@ -322,6 +388,9 @@ module cpu(
             EX_MEM_Jal <= 1'b0;
             EX_MEM_Jalr <= 1'b0;
             EX_MEM_Funct3 <= 3'b0;
+            EX_MEM_PC <= 32'b0;
+            EX_MEM_predict_branch_target <= 32'b0;
+            EX_MEM_predict_taken <= 0;
         end else if (flush) begin
             EX_MEM_BranchTarget <= 32'b0;
             EX_MEM_Zero <= 1'b0;
@@ -336,6 +405,9 @@ module cpu(
             EX_MEM_Jal <= 1'b0;
             EX_MEM_Jalr <= 1'b0;
             EX_MEM_Funct3 <= 3'b0;
+            EX_MEM_PC <= 32'b0;
+            EX_MEM_predict_branch_target <= 32'b0;
+            EX_MEM_predict_taken <= 0;
         end else begin
             EX_MEM_BranchTarget <= branch_target;
             EX_MEM_Zero <= zero_flag;
@@ -350,8 +422,14 @@ module cpu(
             EX_MEM_Jal <= ID_EX_Jal;
             EX_MEM_Jalr <= ID_EX_Jalr;
             EX_MEM_Funct3 <= ID_EX_Funct3;
+            EX_MEM_PC <= ID_EX_PC;
+            EX_MEM_predict_branch_target <= ID_EX_predict_branch_target;
+            EX_MEM_predict_taken <= ID_EX_predict_taken;
         end
     end
+
+    assign branch_predict_missed = (EX_MEM_Branch | EX_MEM_Jal | EX_MEM_Jalr) & (ID_EX_predict_taken != branch_taken);
+    assign branch_target_missed = (EX_MEM_Branch | EX_MEM_Jal | EX_MEM_Jalr) & branch_taken & (EX_MEM_predict_branch_target != EX_MEM_BranchTarget);
     
     // Memory stage (MEM)
     assign data_addr = EX_MEM_ALUResult;
@@ -395,7 +473,7 @@ module cpu(
     // Pipeline control logic
     always @(*) begin
         pipeline_stall = stall;
-        flush = branch_taken;
+        flush = (EX_MEM_Branch | EX_MEM_Jal | EX_MEM_Jalr) && (branch_predict_missed | branch_target_missed);
     end
 
 endmodule 
