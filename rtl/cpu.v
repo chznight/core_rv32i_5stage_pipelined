@@ -152,7 +152,11 @@ module cpu(
             else
                 PC_next = EX_MEM_PC + 4;
         end else begin
-            PC_next = PC + 4;
+            if (predict_taken) begin
+                PC_next = predict_branch_target;
+            end else begin
+                PC_next = PC + 4;
+            end
         end
     end
 
@@ -428,7 +432,7 @@ module cpu(
         end
     end
 
-    assign branch_predict_missed = (EX_MEM_Branch | EX_MEM_Jal | EX_MEM_Jalr) & (ID_EX_predict_taken != branch_taken);
+    assign branch_predict_missed = (EX_MEM_Branch | EX_MEM_Jal | EX_MEM_Jalr) & (EX_MEM_predict_taken != branch_taken);
     assign branch_target_missed = (EX_MEM_Branch | EX_MEM_Jal | EX_MEM_Jalr) & branch_taken & (EX_MEM_predict_branch_target != EX_MEM_BranchTarget);
     
     // Memory stage (MEM)
