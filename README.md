@@ -2,7 +2,7 @@
 
 This project implements a synthesizable 32-bit RISCV CPU with pipeline hazard
 detection/handling. The CPU design is based on RV32I ISA and is
-structured for simulation and FPGA deployment.
+structured for simulation and FPGA deployment. This design includes a 2 bit saturating counter branch predictor.
 
 ## Architecture Overview
 
