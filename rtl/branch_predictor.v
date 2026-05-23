@@ -33,33 +33,22 @@ module branch_predictor (
     assign pc_index = pc[PC_BITS+1:2];
     assign update_predictor_pc_index = update_predictor_pc[PC_BITS+1:2];
     
-    wire [0:1] counter_value;
-    wire [0:1] counter_value_update_predictor;
+    wire [1:0] counter_value;
+    wire [1:0] current_value_before_update;
     assign counter_value = counter_table[pc_index];
-    assign counter_value_update_predictor = counter_table[update_predictor_pc_index];
+    assign current_value_before_update = counter_table[update_predictor_pc_index];
 
-    reg [0:1] next_counter_value_update_predictor;
+    reg [1:0] next_counter_value;
+
+
     always @(*) begin
-        if ((counter_value_update_predictor == 2'b00) && update_predictor_taken) begin
-            next_counter_value_update_predictor = 2'b01;
-        end else if ((counter_value_update_predictor == 2'b00) && !update_predictor_taken) begin
-            next_counter_value_update_predictor = 2'b00;
-        end else if ((counter_value_update_predictor == 2'b01) && update_predictor_taken) begin
-            next_counter_value_update_predictor = 2'b10;
-        end else if ((counter_value_update_predictor == 2'b01) && !update_predictor_taken) begin
-            next_counter_value_update_predictor = 2'b00;
-        end else if ((counter_value_update_predictor == 2'b10) && update_predictor_taken) begin
-            next_counter_value_update_predictor = 2'b11;
-        end else if ((counter_value_update_predictor == 2'b10) && !update_predictor_taken) begin
-            next_counter_value_update_predictor = 2'b01;
-        end else if ((counter_value_update_predictor == 2'b11) && update_predictor_taken) begin
-            next_counter_value_update_predictor = 2'b11;
-        end else if ((counter_value_update_predictor == 2'b11) && !update_predictor_taken) begin
-            next_counter_value_update_predictor = 2'b10;
+        if (update_predictor_taken) begin
+            next_counter_value = (current_value_before_update == 2'b11) ? 2'b11 : current_value_before_update + 2'b01;
         end else begin
-            next_counter_value_update_predictor = 2'b00;
+            next_counter_value = (current_value_before_update == 2'b00) ? 2'b00 : current_value_before_update - 2'b01;
         end
     end
+
 
     always @(*) begin
         predict_taken = 0;
@@ -76,7 +65,7 @@ module branch_predictor (
     
     assign predict_branch_target = branch_target_table[pc_index];
 
-    always @(negedge clk or posedge reset) begin
+    always @(posedge clk or posedge reset) begin
         if (reset) begin
             for (i = 0; i < TABLE_LEN; i = i + 1) begin
                 branch_target_table[i] <= 32'b0;
@@ -92,11 +81,11 @@ module branch_predictor (
                 branch_tag_table[update_predictor_pc_index] <= update_predictor_pc[31:PC_BITS+2];
                 instruction_type_table[update_predictor_pc_index] <= instruction_type;
             end
-            counter_table[update_predictor_pc_index] <= next_counter_value_update_predictor;
+            counter_table[update_predictor_pc_index] <= next_counter_value;
         end
     end
 
-    always @(negedge clk or posedge reset) begin
+    always @(posedge clk or posedge reset) begin
         if (reset) begin
             predictor_miss_counter <= 32'b0;
             predictor_target_miss_counter <= 32'b0;
@@ -107,7 +96,7 @@ module branch_predictor (
         end
     end
 
-    always @(negedge clk or posedge reset) begin
+    always @(posedge clk or posedge reset) begin
         if (reset) begin
             total_branches_counter <= 32'b0;
         end else if (update_predictor_en) begin
