@@ -12,6 +12,7 @@ module branch_predictor (
     input wire predictor_target_missed,
     input wire [1:0] instruction_type
 );
+
     parameter PC_BITS = 8;
     parameter TABLE_LEN = 1 << PC_BITS;
     parameter JMP_TYPE=2'b10, BRANCH_TYPE=2'b01;
@@ -68,20 +69,23 @@ module branch_predictor (
     always @(posedge clk or posedge reset) begin
         if (reset) begin
             for (i = 0; i < TABLE_LEN; i = i + 1) begin
-                branch_target_table[i] <= 32'b0;
                 branch_target_table_valid[i] <= 1'b0;
-                branch_tag_table[i] <= {30-PC_BITS{1'b0}};
                 counter_table[i] <= 2'b01;
                 instruction_type_table[i] <= 2'b00;
             end
         end else if (update_predictor_en) begin
             if (update_predictor_taken) begin
-                branch_target_table[update_predictor_pc_index] <= update_predictor_branch_target;
                 branch_target_table_valid[update_predictor_pc_index] <= 1'b1;
-                branch_tag_table[update_predictor_pc_index] <= update_predictor_pc[31:PC_BITS+2];
                 instruction_type_table[update_predictor_pc_index] <= instruction_type;
             end
             counter_table[update_predictor_pc_index] <= next_counter_value;
+        end
+    end
+	 
+	 always @(posedge clk) begin
+        if (update_predictor_en & update_predictor_taken) begin
+            branch_target_table[update_predictor_pc_index] <= update_predictor_branch_target;
+            branch_tag_table[update_predictor_pc_index] <= update_predictor_pc[31:PC_BITS+2];
         end
     end
 
@@ -103,5 +107,6 @@ module branch_predictor (
             total_branches_counter <= total_branches_counter + 1;
         end
     end
+
 
 endmodule

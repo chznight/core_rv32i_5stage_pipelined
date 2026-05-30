@@ -138,6 +138,12 @@ module cpu_bubble_sort_tb;
             $display("Sort completion not observed before timeout (x20 = %0d)",
                      cpu_inst.registers.registers[20]);
         $display("Total clock cycles after reset deassert: %0d", cycle_count);
+        $display("Total branches: %0d", cpu_inst.branch_predictor.total_branches_counter);
+        $display("Branch direction misses: %0d", cpu_inst.branch_predictor.predictor_miss_counter);
+        $display("Branch target misses: %0d", cpu_inst.branch_predictor.predictor_target_miss_counter);
+        $display("Total branch misses: %0d",
+                 cpu_inst.branch_predictor.predictor_miss_counter +
+                 cpu_inst.branch_predictor.predictor_target_miss_counter);
         $display("x20 = %0d (Expected: 1)", cpu_inst.registers.registers[20]);
         // Display the results
         $display("Bubble Sort Test Results:");
