@@ -16,9 +16,7 @@ module hazard_detection(
         if (ID_EX_MemRead && 
             ((ID_EX_Rd == IF_ID_Rs1) || (ID_EX_Rd == IF_ID_Rs2)) && 
             (ID_EX_Rd != 0)) begin
-            stall = 1'b1; // Stall the pipelineß
-        end else if (EX_MEM_MemRead && ((EX_MEM_Rd == IF_ID_Rs1) || (EX_MEM_Rd == IF_ID_Rs2)) && (EX_MEM_Rd != 0)) begin 
-            stall = 1'b1; 
+            stall = 1'b1; // Stall the pipeline
         end else begin
             stall = 1'b0; // No stall
         end

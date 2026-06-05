@@ -59,16 +59,12 @@ module cpu(
     reg EX_MEM_predict_taken;
 
     // MEM/WB
-    reg [31:0] MEM_WB_ReadData_stage1;
-    reg [31:0] MEM_WB_ALUResult_stage1;
-    reg [4:0] MEM_WB_Rd_stage1;
-    reg MEM_WB_RegWrite_stage1;
-    reg MEM_WB_MemtoReg_stage1;
-    reg [31:0] MEM_WB_ReadData_stage2;
-    reg [31:0] MEM_WB_ALUResult_stage2;
-    reg [4:0] MEM_WB_Rd_stage2;
-    reg MEM_WB_RegWrite_stage2;
-    reg MEM_WB_MemtoReg_stage2;
+    reg [31:0] MEM_WB_ReadData;
+    reg [31:0] MEM_WB_ALUResult;
+    reg [4:0] MEM_WB_Rd;
+    reg MEM_WB_RegWrite;
+    reg MEM_WB_MemtoReg;
+
     // Internal signals
     // IF stage
     reg [31:0] PC;
@@ -234,11 +230,11 @@ module cpu(
     register_file registers(
         .clk(clk),
         .rst(rst),
-        .reg_write(MEM_WB_RegWrite_stage2),
+        .reg_write(MEM_WB_RegWrite),
         .read_reg1(IF_ID_Instruction[19:15]), // rs1
         .read_reg2(IF_ID_Instruction[24:20]), // rs2
-        .write_reg(MEM_WB_Rd_stage2),
-        .write_data(MEM_WB_MemtoReg_stage2 ? MEM_WB_ReadData_stage2 : MEM_WB_ALUResult_stage2),
+        .write_reg(MEM_WB_Rd),
+        .write_data(MEM_WB_MemtoReg ? MEM_WB_ReadData : MEM_WB_ALUResult),
         .read_data1(reg_data1),
         .read_data2(reg_data2)
     );
@@ -329,11 +325,9 @@ module cpu(
     // Execute stage (EX)
     forwarding_unit forwarding(
         .EX_MEM_RegWrite(EX_MEM_RegWrite),
-        .MEM_WB_RegWrite_stage1(MEM_WB_RegWrite_stage1),
-        .MEM_WB_RegWrite_stage2(MEM_WB_RegWrite_stage2),
+        .MEM_WB_RegWrite(MEM_WB_RegWrite),
         .EX_MEM_Rd(EX_MEM_Rd),
-        .MEM_WB_Rd_stage1(MEM_WB_Rd_stage1),
-        .MEM_WB_Rd_stage2(MEM_WB_Rd_stage2),
+        .MEM_WB_Rd(MEM_WB_Rd),
         .ID_EX_Rs1(ID_EX_Rs1),
         .ID_EX_Rs2(ID_EX_Rs2),
         .ForwardA(forward_a),
@@ -344,9 +338,8 @@ module cpu(
     always @(*) begin
         case(forward_a)
             2'b00: alu_in1_fwding_mux = ID_EX_RegR1;
-            2'b01: alu_in1_fwding_mux = MEM_WB_MemtoReg_stage2 ? MEM_WB_ReadData_stage2 : MEM_WB_ALUResult_stage2;
+            2'b01: alu_in1_fwding_mux = MEM_WB_MemtoReg ? MEM_WB_ReadData : MEM_WB_ALUResult;
             2'b10: alu_in1_fwding_mux = EX_MEM_ALUResult;
-            2'b11: alu_in1_fwding_mux = MEM_WB_ALUResult_stage1;
             default: alu_in1_fwding_mux = ID_EX_RegR1;
         endcase
     end
@@ -354,9 +347,8 @@ module cpu(
     always @(*) begin
         case(forward_b)
             2'b00: alu_in2_fwding_mux = ID_EX_RegR2;
-            2'b01: alu_in2_fwding_mux = MEM_WB_MemtoReg_stage2 ? MEM_WB_ReadData_stage2 : MEM_WB_ALUResult_stage2;
+            2'b01: alu_in2_fwding_mux = MEM_WB_MemtoReg ? MEM_WB_ReadData : MEM_WB_ALUResult;
             2'b10: alu_in2_fwding_mux = EX_MEM_ALUResult;
-            2'b11: alu_in2_fwding_mux = MEM_WB_ALUResult_stage1;
             default: alu_in2_fwding_mux = ID_EX_RegR2;
         endcase
     end
@@ -376,6 +368,12 @@ module cpu(
     // Branch target calculation
     assign branch_target = ID_EX_Jalr ? ((ID_EX_RegR1 + ID_EX_Imm) & ~32'h1) : (ID_EX_PC + ID_EX_Imm) ;
     
+    // Memory stage (MEM)
+    assign data_addr = alu_result;
+    assign data_out = alu_in2_fwding_mux;
+    assign mem_write = ID_EX_MemWrite & !flush;
+    assign mem_read = ID_EX_MemRead & !flush;
+
     // EX/MEM Pipeline Register
     always @(posedge clk or posedge rst) begin
         if (rst) begin
@@ -435,42 +433,22 @@ module cpu(
     assign branch_predict_missed = (EX_MEM_Branch | EX_MEM_Jal | EX_MEM_Jalr) & (EX_MEM_predict_taken != branch_taken);
     assign branch_target_missed = (EX_MEM_Branch | EX_MEM_Jal | EX_MEM_Jalr) & branch_taken & (EX_MEM_predict_branch_target != EX_MEM_BranchTarget);
     
-    // Memory stage (MEM)
-    assign data_addr = EX_MEM_ALUResult;
-    assign data_out = EX_MEM_RegR2;
-    assign mem_write = EX_MEM_MemWrite;
-    assign mem_read = EX_MEM_MemRead;
+
     
     // MEM/WB Pipeline Register
     always @(posedge clk or posedge rst) begin
         if (rst) begin
-            MEM_WB_ReadData_stage1 <= 32'b0;
-            MEM_WB_ALUResult_stage1 <= 32'b0;
-            MEM_WB_Rd_stage1 <= 5'b0;
-            MEM_WB_RegWrite_stage1 <= 1'b0;
-            MEM_WB_MemtoReg_stage1 <= 1'b0;
+            MEM_WB_ReadData <= 32'b0;
+            MEM_WB_ALUResult <= 32'b0;
+            MEM_WB_Rd <= 5'b0;
+            MEM_WB_RegWrite <= 1'b0;
+            MEM_WB_MemtoReg <= 1'b0;
         end else begin
-            MEM_WB_ReadData_stage1 <= 32'b0;
-            MEM_WB_ALUResult_stage1 <= EX_MEM_ALUResult;
-            MEM_WB_Rd_stage1 <= EX_MEM_Rd;
-            MEM_WB_RegWrite_stage1 <= EX_MEM_RegWrite;
-            MEM_WB_MemtoReg_stage1 <= EX_MEM_MemtoReg;
-        end
-    end
-
-    always @(posedge clk or posedge rst) begin
-        if (rst) begin
-            MEM_WB_ReadData_stage2 <= 32'b0;
-            MEM_WB_ALUResult_stage2 <= 32'b0;
-            MEM_WB_Rd_stage2 <= 5'b0;
-            MEM_WB_RegWrite_stage2 <= 1'b0;
-            MEM_WB_MemtoReg_stage2 <= 1'b0;
-        end else begin
-            MEM_WB_ReadData_stage2 <= data_in;
-            MEM_WB_ALUResult_stage2 <= MEM_WB_ALUResult_stage1;
-            MEM_WB_Rd_stage2 <= MEM_WB_Rd_stage1;
-            MEM_WB_RegWrite_stage2 <= MEM_WB_RegWrite_stage1;
-            MEM_WB_MemtoReg_stage2 <= MEM_WB_MemtoReg_stage1;
+            MEM_WB_ReadData <= data_in;
+            MEM_WB_ALUResult <= EX_MEM_ALUResult;
+            MEM_WB_Rd <= EX_MEM_Rd;
+            MEM_WB_RegWrite <= EX_MEM_RegWrite;
+            MEM_WB_MemtoReg <= EX_MEM_MemtoReg;
         end
     end
 
