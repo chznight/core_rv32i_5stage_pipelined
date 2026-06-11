@@ -374,7 +374,7 @@ module cpu(
     );
     
     // Branch target calculation
-    assign branch_target = ID_EX_Jalr ? ((ID_EX_RegR1 + ID_EX_Imm) & ~32'h1) : (ID_EX_PC + ID_EX_Imm) ;
+    assign branch_target = ID_EX_Jalr ? ((alu_in1_fwding_mux + ID_EX_Imm) & ~32'h1) : (ID_EX_PC + ID_EX_Imm) ;
     
     // EX/MEM Pipeline Register
     always @(posedge clk or posedge rst) begin
