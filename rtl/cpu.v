@@ -44,12 +44,10 @@ module cpu(
     reg [31:0] EX_MEM_BranchTarget;
     reg EX_MEM_Zero;
     reg [31:0] EX_MEM_ALUResult;
-    reg [31:0] EX_MEM_RegR2;
     reg [4:0] EX_MEM_Rd;
     reg [2:0] EX_MEM_Funct3;
     reg EX_MEM_RegWrite;
     reg EX_MEM_MemRead;
-    reg EX_MEM_MemWrite;
     reg EX_MEM_MemtoReg;
     reg EX_MEM_Branch;
     reg EX_MEM_Jal;
@@ -74,7 +72,6 @@ module cpu(
     wire branch_taken;
     
     // ID stage
-    wire [4:0] rs1, rs2, rd;
     wire [31:0] reg_data1, reg_data2;
     wire [31:0] imm_ext;
     wire [3:0] alu_op;
@@ -87,7 +84,6 @@ module cpu(
     wire [31:0] alu_result;
     wire zero_flag;
     wire [31:0] branch_target;
-    wire [31:0] jump_target;
     wire jal;
     wire jalr;
     wire auipc;
@@ -380,11 +376,9 @@ module cpu(
             EX_MEM_BranchTarget <= 32'b0;
             EX_MEM_Zero <= 1'b0;
             EX_MEM_ALUResult <= 32'b0;
-            EX_MEM_RegR2 <= 32'b0;
             EX_MEM_Rd <= 5'b0;
             EX_MEM_RegWrite <= 1'b0;
             EX_MEM_MemRead <= 1'b0;
-            EX_MEM_MemWrite <= 1'b0;
             EX_MEM_MemtoReg <= 1'b0;
             EX_MEM_Branch <= 1'b0;
             EX_MEM_Jal <= 1'b0;
@@ -397,11 +391,9 @@ module cpu(
             EX_MEM_BranchTarget <= 32'b0;
             EX_MEM_Zero <= 1'b0;
             EX_MEM_ALUResult <= 32'b0;
-            EX_MEM_RegR2 <= 32'b0;
             EX_MEM_Rd <= 5'b0;
             EX_MEM_RegWrite <= 1'b0;
             EX_MEM_MemRead <= 1'b0;
-            EX_MEM_MemWrite <= 1'b0;
             EX_MEM_MemtoReg <= 1'b0;
             EX_MEM_Branch <= 1'b0;
             EX_MEM_Jal <= 1'b0;
@@ -414,11 +406,9 @@ module cpu(
             EX_MEM_BranchTarget <= branch_target;
             EX_MEM_Zero <= zero_flag;
             EX_MEM_ALUResult <= alu_result;
-            EX_MEM_RegR2 <= alu_in2_fwding_mux;
             EX_MEM_Rd <= ID_EX_Rd;
             EX_MEM_RegWrite <= ID_EX_RegWrite;
             EX_MEM_MemRead <= ID_EX_MemRead;
-            EX_MEM_MemWrite <= ID_EX_MemWrite;
             EX_MEM_MemtoReg <= ID_EX_MemtoReg;
             EX_MEM_Branch <= ID_EX_Branch;
             EX_MEM_Jal <= ID_EX_Jal;
