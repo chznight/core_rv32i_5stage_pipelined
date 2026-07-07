@@ -6,12 +6,11 @@ structured for simulation and FPGA deployment. This design includes a 2 bit satu
 
 ## Architecture Overview
 
-The CPU features a 6-stage pipeline:
+The CPU features a 5-stage pipeline:
 1. **Instruction Fetch (IF)**: Fetches instructions from memory
 2. **Instruction Decode (ID)**: Decodes instructions and reads register values
 3. **Execute (EX)**: Performs ALU operations
-4. **Memory Stage 1 (MEM1)**: Issues load/store requests to synchronous block SRAM
-5. **Memory Stage 2 (MEM2)**: Captures synchronous block SRAM read data
+4. **Memory Stage (MEM)**: Issues load/store requests to synchronous block SRAM
 6. **Write Back (WB)**: Writes results back to registers
 
 ## Memory System
@@ -23,6 +22,8 @@ SRAM image:
 - Port 2 is the data load/store port.
 - Program code starts at word `0`.
 - Testbench memory images are loaded from `tb/*.hex` with `$readmemh`.
+- Data writes use byte enables, allowing byte, halfword, and word stores on the
+  32-bit memory path.
 
 This keeps instruction and data sections in a single memory image while still
 allowing the pipeline to fetch an instruction and access data in the same cycle.
@@ -48,8 +49,9 @@ The CPU includes mechanisms to handle pipeline hazards:
 The CPU supports a RISC-V like instruction set with the following types:
 
 - **R-type**: Register-to-register operations (ADD, SUB, AND, OR, XOR, SLL, SRL, SRA, SLT, SLTU)
-- **I-type**: Register-immediate operations (ADDI, ANDI, ORI, XORI, SLTI, SLTIU, SLLI, SRLI, SRAI, LW)
-- **S-type**: Store operations (SW)
+- **I-type**: Register-immediate operations (ADDI, ANDI, ORI, XORI, SLTI, SLTIU, SLLI, SRLI, SRAI)
+- **Load**: LB, LH, LW, LBU, LHU
+- **S-type**: Store operations (SB, SH, SW)
 - **B-type**: Branch operations (BEQ, BNE, BLT, BGE, BLTU, BGEU)
 - **U-type**: Upper immediate operations (LUI, AUIPC)
 - **J-type**: Jump operations (JAL, JALR)
@@ -64,6 +66,8 @@ The CPU supports a RISC-V like instruction set with the following types:
 - `rtl/immediate_gen.v`: Immediate value generator for different instruction types
 - `rtl/hazard_detection.v`: Detects load-use hazards
 - `rtl/forwarding_unit.v`: Implements data forwarding
+- `rtl/memory_read_adapter.v`: Aligns and sign/zero-extends load data
+- `rtl/memory_write_adapter.v`: Generates store data lanes and byte enables
 - `testcases/*.s`: Assembly programs used to generate memory images
 - `tb/*.hex`: Unified memory initialization files for simulation
 - `tb/cpu_*_tb.v`: Testbenches for CPU validation
@@ -78,15 +82,16 @@ Example with Icarus Verilog:
 
 ```sh
 iverilog -g2005 -o /tmp/cpu_full_test_tb \
-  rtl/alu.v rtl/control_unit.v rtl/bsram.v rtl/cpu.v \
+  rtl/alu.v rtl/branch_predictor.v rtl/control_unit.v rtl/bsram.v rtl/cpu.v \
   rtl/forwarding_unit.v rtl/hazard_detection.v rtl/immediate_gen.v \
+  rtl/memory_read_adapter.v rtl/memory_write_adapter.v \
   rtl/register_file.v tb/cpu_full_test_tb.v
 vvp /tmp/cpu_full_test_tb
 ```
 
-The regression testbenches cover arithmetic, memory operations, branches,
-forwarding/load-use hazards, Fibonacci, GCD, bubble sort, and a longer ALU
-benchmark.
+The regression testbenches cover arithmetic, byte/halfword/word memory
+operations, branches, forwarding/load-use hazards, Fibonacci, GCD, bubble sort,
+and a longer ALU benchmark.
 
 ## FPGA
 
