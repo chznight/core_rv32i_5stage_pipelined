@@ -177,7 +177,7 @@ module cpu(
         else
             branch_type = 2'b00;
     end
-
+    /*
     assign branch_taken = ((EX_MEM_Branch) & 
                             (((EX_MEM_Funct3 == 3'b000) & (EX_MEM_Zero == 1)) |
                             ((EX_MEM_Funct3 == 3'b001) & (EX_MEM_Zero == 0))  |
@@ -187,7 +187,9 @@ module cpu(
                             ((EX_MEM_Funct3 == 3'b111) & (EX_MEM_Zero == 1))))|
                             (EX_MEM_Jal) |
                             (EX_MEM_Jalr);
-                            
+    */
+    assign branch_taken = (EX_MEM_Jal | EX_MEM_Jalr) | (EX_MEM_Branch & (EX_MEM_Zero ^ EX_MEM_Funct3[0] ^ EX_MEM_Funct3[2]));
+
     // IF/ID Pipeline Register
     always @(posedge clk or posedge rst) begin
         if (rst) begin
