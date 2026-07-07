@@ -14,6 +14,7 @@ module cpu_fibonacci_tb;
     wire [31:0] data_in;
     wire mem_write;
     wire mem_read;
+    wire [3:0] byte_enable;
 
     // Instantiate the CPU
     cpu cpu_inst(
@@ -25,7 +26,8 @@ module cpu_fibonacci_tb;
         .data_out(data_out),
         .data_in(data_in),
         .mem_write(mem_write),
-        .mem_read(mem_read)
+        .mem_read(mem_read),
+        .byte_enable(byte_enable)
     );
 
     // One dual-port SRAM presents a unified memory image to the CPU.
@@ -40,11 +42,13 @@ module cpu_fibonacci_tb;
         .data_in_port1(32'b0),
         .data_out_port1(instruction),
         .we_port1(1'b0),
+        .byte_enable_port1(4'b1111),
         .re_port1(1'b1),
         .addr_port2(data_addr),
         .data_in_port2(data_out),
         .data_out_port2(data_in),
         .we_port2(mem_write),
+        .byte_enable_port2(byte_enable),
         .re_port2(mem_read)
     );
 

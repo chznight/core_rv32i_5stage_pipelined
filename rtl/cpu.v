@@ -8,7 +8,8 @@ module cpu(
     output wire [31:0] data_out,
     input wire [31:0] data_in,
     output wire mem_write,
-    output wire mem_read
+    output wire mem_read,
+    output wire [3:0] byte_enable
 );
 
     // Pipeline stage registers
@@ -89,6 +90,7 @@ module cpu(
     wire auipc;
     wire [31:0] predict_branch_target;
     wire predict_taken;
+    wire [31:0] load_result;
     reg [31:0] predict_branch_target_inflight;
     reg predict_taken_inflight;
 
@@ -366,9 +368,18 @@ module cpu(
     
     // Memory stage (MEM)
     assign data_addr = alu_result;
-    assign data_out = alu_in2_fwding_mux;
+    //assign data_out = alu_in2_fwding_mux;
     assign mem_write = ID_EX_MemWrite & !flush;
     assign mem_read = ID_EX_MemRead & !flush;
+
+    memory_write_adapter memory_write_adapter (
+        .mem_write(ID_EX_MemWrite),
+        .mem_data_out(alu_in2_fwding_mux),
+        .wr_addr(alu_result),
+        .funct3(ID_EX_Funct3),
+        .data_out(data_out),
+        .byte_enable(byte_enable)
+    );
 
     // EX/MEM Pipeline Register
     always @(posedge clk or posedge rst) begin
@@ -423,7 +434,13 @@ module cpu(
     assign branch_predict_missed = (EX_MEM_Branch | EX_MEM_Jal | EX_MEM_Jalr) & (EX_MEM_predict_taken != branch_taken);
     assign branch_target_missed = (EX_MEM_Branch | EX_MEM_Jal | EX_MEM_Jalr) & branch_taken & (EX_MEM_predict_branch_target != EX_MEM_BranchTarget);
     
-
+    memory_read_adapter memory_read_adapter (
+        .data_in(data_in),
+        .funct3(EX_MEM_Funct3),
+        .addr_bits_lsb(EX_MEM_ALUResult[1:0]),
+        .mem_read(EX_MEM_MemRead),
+        .load_result(load_result)
+    );
     
     // MEM/WB Pipeline Register
     always @(posedge clk or posedge rst) begin
@@ -434,7 +451,7 @@ module cpu(
             MEM_WB_RegWrite <= 1'b0;
             MEM_WB_MemtoReg <= 1'b0;
         end else begin
-            MEM_WB_ReadData <= data_in;
+            MEM_WB_ReadData <= load_result;
             MEM_WB_ALUResult <= EX_MEM_ALUResult;
             MEM_WB_Rd <= EX_MEM_Rd;
             MEM_WB_RegWrite <= EX_MEM_RegWrite;

@@ -12,12 +12,14 @@ module bsram #(
     input  wire [DATA_WIDTH-1:0] data_in_port1,
     output wire [DATA_WIDTH-1:0] data_out_port1,
     input  wire                  we_port1,
+    input  wire [(DATA_WIDTH/8)-1:0] byte_enable_port1,
     input  wire                  re_port1,
 
     input  wire [31:0]           addr_port2,
     input  wire [DATA_WIDTH-1:0] data_in_port2,
     output wire [DATA_WIDTH-1:0] data_out_port2,
     input  wire                  we_port2,
+    input  wire [(DATA_WIDTH/8)-1:0] byte_enable_port2,
     input  wire                  re_port2
 );
 
@@ -31,6 +33,7 @@ module bsram #(
     endfunction
 
     localparam ADDR_WIDTH = clog2(DEPTH);
+    localparam BYTE_COUNT = DATA_WIDTH / 8;
 
     reg [DATA_WIDTH-1:0] mem [0:DEPTH-1];
     
@@ -54,12 +57,19 @@ module bsram #(
         end
     end
 
+    integer byte_index_port1;
+    integer byte_index_port2;
+
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             read_addr_port1 <= {ADDR_WIDTH{1'b0}};
         end else begin
             if (we_port1) begin
-                mem[word_addr_port1] <= data_in_port1;
+                for (byte_index_port1 = 0; byte_index_port1 < BYTE_COUNT; byte_index_port1 = byte_index_port1 + 1) begin
+                    if (byte_enable_port1[byte_index_port1]) begin
+                        mem[word_addr_port1][byte_index_port1*8 +: 8] <= data_in_port1[byte_index_port1*8 +: 8];
+                    end
+                end
             end else if (re_port1) begin
                 read_addr_port1 <= word_addr_port1;
             end
@@ -71,7 +81,11 @@ module bsram #(
             read_addr_port2 <= {ADDR_WIDTH{1'b0}};
         end else begin
             if (we_port2) begin
-                mem[word_addr_port2] <= data_in_port2;
+                for (byte_index_port2 = 0; byte_index_port2 < BYTE_COUNT; byte_index_port2 = byte_index_port2 + 1) begin
+                    if (byte_enable_port2[byte_index_port2]) begin
+                        mem[word_addr_port2][byte_index_port2*8 +: 8] <= data_in_port2[byte_index_port2*8 +: 8];
+                    end
+                end
             end else if (re_port2) begin
                 read_addr_port2 <= word_addr_port2;
             end
