@@ -11,13 +11,15 @@ module cpu(
     output wire mem_read,
     output wire [3:0] byte_enable
 );
+    parameter PREDICTOR_PHT_BITS = 9;
+    parameter PREDICTOR_BTB_BITS = 8;
 
     // Pipeline stage registers
     // IF/ID
     reg [31:0] IF_ID_PC;
     reg [31:0] IF_ID_Instruction;
     reg [31:0] IF_ID_predict_branch_target;
-    reg [7:0] IF_ID_gshare_index;
+    reg [PREDICTOR_PHT_BITS-1:0] IF_ID_gshare_index;
     reg IF_ID_predict_taken;
     
     // ID/EX
@@ -41,7 +43,7 @@ module cpu(
     reg ID_EX_Auipc;
     reg [31:0] ID_EX_predict_branch_target;
     reg ID_EX_predict_taken;
-    reg [7:0] ID_EX_gshare_index;
+    reg [PREDICTOR_PHT_BITS-1:0] ID_EX_gshare_index;
     
     // EX/MEM
     reg [31:0] EX_MEM_BranchTarget;
@@ -58,7 +60,7 @@ module cpu(
     reg [31:0] EX_MEM_PC;
     reg [31:0] EX_MEM_predict_branch_target;
     reg EX_MEM_predict_taken;
-    reg [7:0] EX_MEM_gshare_index;
+    reg [PREDICTOR_PHT_BITS-1:0] EX_MEM_gshare_index;
 
     // MEM/WB
     reg [31:0] MEM_WB_ReadData;
@@ -96,11 +98,11 @@ module cpu(
     wire [31:0] load_result;
     reg [31:0] predict_branch_target_inflight;
     reg predict_taken_inflight;
-    reg [7:0] gshare_index_inflight;
+    reg [PREDICTOR_PHT_BITS-1:0] gshare_index_inflight;
 
     wire branch_predict_missed;
     wire branch_target_missed;
-    wire [7:0] branch_gshare_index;
+    wire [PREDICTOR_PHT_BITS-1:0] branch_gshare_index;
 
     // Hazard detection unit signals
     wire stall;
@@ -131,13 +133,13 @@ module cpu(
             PC_in_flight_valid <= 1'b0;
             predict_branch_target_inflight <= 32'b0;
             predict_taken_inflight <= 1'b0;
-            gshare_index_inflight <= 7'b0;
+            gshare_index_inflight <= {PREDICTOR_PHT_BITS{1'b0}};
         end else if (flush) begin
             PC_in_flight <= 32'b0;
             PC_in_flight_valid <= 1'b0;
             predict_branch_target_inflight <= 32'b0;
             predict_taken_inflight <= 1'b0;
-            gshare_index_inflight <= 7'b0;
+            gshare_index_inflight <= {PREDICTOR_PHT_BITS{1'b0}};
         end else if (!pipeline_stall) begin
             PC_in_flight <= PC;
             PC_in_flight_valid <= 1'b1;
@@ -162,7 +164,10 @@ module cpu(
         end
     end
 
-    branch_predictor branch_predictor (
+    branch_predictor  #(
+        .PHT_BITS(PREDICTOR_PHT_BITS), 
+        .BTB_BITS(PREDICTOR_BTB_BITS)
+    ) branch_predictor (
         .clk(clk),
         .reset(rst),
         .pc(PC),
@@ -208,14 +213,14 @@ module cpu(
             IF_ID_Instruction <= 32'b0;
             IF_ID_predict_branch_target <= 32'b0;
             IF_ID_predict_taken <= 0;
-            IF_ID_gshare_index <= 7'b0;
+            IF_ID_gshare_index <= {PREDICTOR_PHT_BITS{1'b0}};
         end else if (!pipeline_stall) begin
             if (flush | !PC_in_flight_valid) begin
                 IF_ID_Instruction <= 32'b0; // NOP on flush
                 IF_ID_PC <= 32'b0;
                 IF_ID_predict_branch_target <= 32'b0;
                 IF_ID_predict_taken <= 0;
-                IF_ID_gshare_index <= 7'b0;
+                IF_ID_gshare_index <= {PREDICTOR_PHT_BITS{1'b0}};
             end else begin
                 IF_ID_PC <= PC_in_flight;
                 IF_ID_Instruction <= instruction;
@@ -291,7 +296,7 @@ module cpu(
             ID_EX_Auipc <= 1'b0;
             ID_EX_predict_branch_target <= 32'b0;
             ID_EX_predict_taken <= 0;
-            ID_EX_gshare_index <= 7'b0;
+            ID_EX_gshare_index <= {PREDICTOR_PHT_BITS{1'b0}};
         end else if (flush || stall) begin
             ID_EX_PC <= 32'b0;
             ID_EX_Rs1 <= 5'b0;
@@ -313,7 +318,7 @@ module cpu(
             ID_EX_Auipc <= 1'b0;
             ID_EX_predict_branch_target <= 32'b0;
             ID_EX_predict_taken <= 0;
-            ID_EX_gshare_index <= 7'b0;
+            ID_EX_gshare_index <= {PREDICTOR_PHT_BITS{1'b0}};
         end else if (!pipeline_stall) begin
             ID_EX_PC <= IF_ID_PC;
             ID_EX_Rs1 <= IF_ID_Instruction[19:15];
@@ -417,7 +422,7 @@ module cpu(
             EX_MEM_PC <= 32'b0;
             EX_MEM_predict_branch_target <= 32'b0;
             EX_MEM_predict_taken <= 0;
-            EX_MEM_gshare_index <= 7'b0;
+            EX_MEM_gshare_index <= {PREDICTOR_PHT_BITS{1'b0}};
         end else if (flush) begin
             EX_MEM_BranchTarget <= 32'b0;
             EX_MEM_Zero <= 1'b0;
@@ -433,7 +438,7 @@ module cpu(
             EX_MEM_PC <= 32'b0;
             EX_MEM_predict_branch_target <= 32'b0;
             EX_MEM_predict_taken <= 0;
-            EX_MEM_gshare_index <= 7'b0;
+            EX_MEM_gshare_index <= {PREDICTOR_PHT_BITS{1'b0}};
         end else begin
             EX_MEM_BranchTarget <= branch_target;
             EX_MEM_Zero <= zero_flag;
