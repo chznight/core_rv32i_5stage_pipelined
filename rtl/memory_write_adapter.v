@@ -13,12 +13,12 @@ module memory_write_adapter (
             case (funct3)
                 3'b000: begin // SB
                     byte_enable = 4'b0001 << wr_addr[1:0];
-                    data_out    = {24'b0, mem_data_out[7:0]} << {wr_addr[1:0], 3'b000};
+                    data_out    = {4{mem_data_out[7:0]}};
                 end
 
                 3'b001: begin // SH
                     byte_enable = 4'b0011 << {wr_addr[1], 1'b0};
-                    data_out    = {16'b0, mem_data_out[15:0]} << {wr_addr[1], 4'b0000};
+                    data_out    = {2{mem_data_out[15:0]}};
                 end
 
                 3'b010: begin // SW
