@@ -124,20 +124,19 @@ module branch_predictor #(
         if (reset) begin
             global_history <= {PHT_BITS{1'b0}};
             for (i = 0; i < PHT_LEN; i = i + 1) begin
-                counter_table[i] <= 2'b01;
+                counter_table[i] <= 2'b10;
             end
             for (i = 0; i < BTB_LEN; i = i + 1) begin
                 branch_target_table_valid[i] <= 1'b0;
             end
         end else begin
             // Update PHT counter only when a conditional branch resolves.
+            // Update global control-flow history for branches and jumps.
             if (update_pht_en) begin
                 counter_table[update_gshare_index] <= next_counter_value;
-            end
-            // Update global control-flow history for branches and jumps.
-            if (update_pht_en || update_btb_en) begin
                 global_history <= {global_history[PHT_BITS-2:0], update_predictor_taken};
             end
+
             // Mark BTB entry valid only when storing a taken target.
             if (update_predictor_taken && update_btb_en) begin
                 branch_target_table_valid[update_btb_index] <= 1'b1;

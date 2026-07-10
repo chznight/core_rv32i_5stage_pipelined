@@ -11,7 +11,7 @@ module cpu(
     output wire mem_read,
     output wire [3:0] byte_enable
 );
-    parameter PREDICTOR_PHT_BITS = 9;
+    parameter PREDICTOR_PHT_BITS = 10;
     parameter PREDICTOR_BTB_BITS = 8;
 
     // Pipeline stage registers
