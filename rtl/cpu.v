@@ -17,6 +17,7 @@ module cpu(
     reg [31:0] IF_ID_PC;
     reg [31:0] IF_ID_Instruction;
     reg [31:0] IF_ID_predict_branch_target;
+    reg [7:0] IF_ID_gshare_index;
     reg IF_ID_predict_taken;
     
     // ID/EX
@@ -40,6 +41,7 @@ module cpu(
     reg ID_EX_Auipc;
     reg [31:0] ID_EX_predict_branch_target;
     reg ID_EX_predict_taken;
+    reg [7:0] ID_EX_gshare_index;
     
     // EX/MEM
     reg [31:0] EX_MEM_BranchTarget;
@@ -56,6 +58,7 @@ module cpu(
     reg [31:0] EX_MEM_PC;
     reg [31:0] EX_MEM_predict_branch_target;
     reg EX_MEM_predict_taken;
+    reg [7:0] EX_MEM_gshare_index;
 
     // MEM/WB
     reg [31:0] MEM_WB_ReadData;
@@ -93,9 +96,11 @@ module cpu(
     wire [31:0] load_result;
     reg [31:0] predict_branch_target_inflight;
     reg predict_taken_inflight;
+    reg [7:0] gshare_index_inflight;
 
     wire branch_predict_missed;
     wire branch_target_missed;
+    wire [7:0] branch_gshare_index;
 
     // Hazard detection unit signals
     wire stall;
@@ -126,16 +131,19 @@ module cpu(
             PC_in_flight_valid <= 1'b0;
             predict_branch_target_inflight <= 32'b0;
             predict_taken_inflight <= 1'b0;
+            gshare_index_inflight <= 7'b0;
         end else if (flush) begin
             PC_in_flight <= 32'b0;
             PC_in_flight_valid <= 1'b0;
             predict_branch_target_inflight <= 32'b0;
             predict_taken_inflight <= 1'b0;
+            gshare_index_inflight <= 7'b0;
         end else if (!pipeline_stall) begin
             PC_in_flight <= PC;
             PC_in_flight_valid <= 1'b1;
             predict_branch_target_inflight <= predict_branch_target;
             predict_taken_inflight <= predict_taken;
+            gshare_index_inflight <= branch_gshare_index;
         end
     end
 
@@ -162,11 +170,14 @@ module cpu(
         .predict_branch_target(predict_branch_target),
         .update_predictor_pc(EX_MEM_PC),
         .update_predictor_branch_target(EX_MEM_BranchTarget),
-        .update_predictor_en(EX_MEM_Branch | EX_MEM_Jal | EX_MEM_Jalr),
+        .update_pht_en(EX_MEM_Branch),
+        .update_btb_en(EX_MEM_Branch | EX_MEM_Jal | EX_MEM_Jalr),
         .update_predictor_taken(branch_taken),
         .predictor_missed(branch_predict_missed),
         .predictor_target_missed(branch_target_missed),
-        .instruction_type(branch_type)
+        .instruction_type(branch_type),
+        .branch_gshare_index(branch_gshare_index),
+        .predictor_update_gshare_index(EX_MEM_gshare_index)
     );
 
     always @(*) begin
@@ -197,17 +208,20 @@ module cpu(
             IF_ID_Instruction <= 32'b0;
             IF_ID_predict_branch_target <= 32'b0;
             IF_ID_predict_taken <= 0;
+            IF_ID_gshare_index <= 7'b0;
         end else if (!pipeline_stall) begin
             if (flush | !PC_in_flight_valid) begin
                 IF_ID_Instruction <= 32'b0; // NOP on flush
                 IF_ID_PC <= 32'b0;
                 IF_ID_predict_branch_target <= 32'b0;
                 IF_ID_predict_taken <= 0;
+                IF_ID_gshare_index <= 7'b0;
             end else begin
                 IF_ID_PC <= PC_in_flight;
                 IF_ID_Instruction <= instruction;
                 IF_ID_predict_branch_target <= predict_branch_target_inflight;
                 IF_ID_predict_taken <= predict_taken_inflight;
+                IF_ID_gshare_index <= gshare_index_inflight;
             end
         end
     end
@@ -277,6 +291,7 @@ module cpu(
             ID_EX_Auipc <= 1'b0;
             ID_EX_predict_branch_target <= 32'b0;
             ID_EX_predict_taken <= 0;
+            ID_EX_gshare_index <= 7'b0;
         end else if (flush || stall) begin
             ID_EX_PC <= 32'b0;
             ID_EX_Rs1 <= 5'b0;
@@ -298,6 +313,7 @@ module cpu(
             ID_EX_Auipc <= 1'b0;
             ID_EX_predict_branch_target <= 32'b0;
             ID_EX_predict_taken <= 0;
+            ID_EX_gshare_index <= 7'b0;
         end else if (!pipeline_stall) begin
             ID_EX_PC <= IF_ID_PC;
             ID_EX_Rs1 <= IF_ID_Instruction[19:15];
@@ -319,6 +335,7 @@ module cpu(
             ID_EX_Funct3 <= IF_ID_Instruction[14:12];
             ID_EX_predict_branch_target <= IF_ID_predict_branch_target;
             ID_EX_predict_taken <= IF_ID_predict_taken;
+            ID_EX_gshare_index <= IF_ID_gshare_index;
         end
     end
     
@@ -400,6 +417,7 @@ module cpu(
             EX_MEM_PC <= 32'b0;
             EX_MEM_predict_branch_target <= 32'b0;
             EX_MEM_predict_taken <= 0;
+            EX_MEM_gshare_index <= 7'b0;
         end else if (flush) begin
             EX_MEM_BranchTarget <= 32'b0;
             EX_MEM_Zero <= 1'b0;
@@ -415,6 +433,7 @@ module cpu(
             EX_MEM_PC <= 32'b0;
             EX_MEM_predict_branch_target <= 32'b0;
             EX_MEM_predict_taken <= 0;
+            EX_MEM_gshare_index <= 7'b0;
         end else begin
             EX_MEM_BranchTarget <= branch_target;
             EX_MEM_Zero <= zero_flag;
@@ -430,6 +449,7 @@ module cpu(
             EX_MEM_PC <= ID_EX_PC;
             EX_MEM_predict_branch_target <= ID_EX_predict_branch_target;
             EX_MEM_predict_taken <= ID_EX_predict_taken;
+            EX_MEM_gshare_index <= ID_EX_gshare_index;
         end
     end
 
