@@ -1,3 +1,6 @@
+// Copyright (c) 2025 chznight
+// SPDX-License-Identifier: MIT
+
 module forwarding_unit(
     input wire EX_MEM_RegWrite,
     input wire MEM_WB_RegWrite,

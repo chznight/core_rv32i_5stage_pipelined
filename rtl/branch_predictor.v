@@ -1,3 +1,6 @@
+// Copyright (c) 2025 chznight
+// SPDX-License-Identifier: MIT
+
 module branch_predictor #(
     parameter PHT_BITS = 9,
     parameter BTB_BITS = 8,

@@ -1,3 +1,6 @@
+// Copyright (c) 2025 chznight
+// SPDX-License-Identifier: MIT
+
 module hazard_detection(
     input wire ID_EX_MemRead,
     input wire EX_MEM_MemRead,

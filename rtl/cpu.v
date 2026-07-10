@@ -1,3 +1,6 @@
+// Copyright (c) 2025 chznight
+// SPDX-License-Identifier: MIT
+
 module cpu(
     input wire clk,
     input wire rst,

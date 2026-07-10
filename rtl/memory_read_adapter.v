@@ -1,3 +1,6 @@
+// Copyright (c) 2025 chznight
+// SPDX-License-Identifier: MIT
+
 module memory_read_adapter (
     input wire [31:0] data_in,
     input wire [2:0] funct3,

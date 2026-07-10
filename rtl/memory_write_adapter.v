@@ -1,3 +1,6 @@
+// Copyright (c) 2025 chznight
+// SPDX-License-Identifier: MIT
+
 module memory_write_adapter (
     input wire mem_write,
     input wire [31:0] mem_data_out,

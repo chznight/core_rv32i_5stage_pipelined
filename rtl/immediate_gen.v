@@ -1,3 +1,6 @@
+// Copyright (c) 2025 chznight
+// SPDX-License-Identifier: MIT
+
 module immediate_gen(
     input wire [31:0] instruction,
     output reg [31:0] imm_ext

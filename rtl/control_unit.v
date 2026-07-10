@@ -1,3 +1,6 @@
+// Copyright (c) 2025 chznight
+// SPDX-License-Identifier: MIT
+
 module control_unit(
     input wire [31:0] instruction,
     output reg reg_write,
