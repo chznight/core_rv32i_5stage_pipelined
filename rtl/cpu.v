@@ -34,7 +34,7 @@ module cpu(
     reg [31:0] ID_EX_RegR2;
     reg [31:0] ID_EX_Imm;
     reg ID_EX_RegWrite;
-    reg [1:0] ID_EX_ALUSrc;
+    reg ID_EX_ALUSrc;
     reg [3:0] ID_EX_ALUOp;
     reg [2:0] ID_EX_Funct3;
     reg ID_EX_MemRead;
