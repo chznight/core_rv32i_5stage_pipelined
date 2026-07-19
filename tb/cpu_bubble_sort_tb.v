@@ -8,7 +8,12 @@ module cpu_bubble_sort_tb;
     integer i;
     integer sorted = 1;
     integer cycle_count;
+    integer retired_instruction_count;
+    integer finish_cycle;
+    integer finish_retired_instruction_count;
     reg sort_done_reported;
+    reg retire_valid_d1;
+    reg retire_valid_d2;
     localparam DISPLAY_EDGE_COUNT = (ARRAY_SIZE < 25) ? ARRAY_SIZE : 25;
     localparam TIMEOUT_CYCLES = (ARRAY_SIZE * ARRAY_SIZE * 100) + 10000;
     localparam DATA_BASE_WORD = 256;
@@ -35,6 +40,13 @@ module cpu_bubble_sort_tb;
         .mem_read(mem_read),
         .byte_enable(byte_enable)
     );
+
+    // All supported instructions either write a register, write memory, or are
+    // conditional branches. Flush removes younger wrong-path instructions.
+    wire execute_instruction_valid = !cpu_inst.flush &&
+                                     (cpu_inst.ID_EX_RegWrite ||
+                                      cpu_inst.ID_EX_MemWrite ||
+                                      cpu_inst.ID_EX_Branch);
 
     // One dual-port SRAM presents a unified memory image to the CPU.
     bsram #(
@@ -67,18 +79,41 @@ module cpu_bubble_sort_tb;
     // Count clock cycles after reset; print once when sort marks done (x20 = 1)
     initial begin
         cycle_count = 0;
+        retired_instruction_count = 0;
+        finish_cycle = -1;
+        finish_retired_instruction_count = -1;
         sort_done_reported = 0;
+        retire_valid_d1 = 0;
+        retire_valid_d2 = 0;
     end
 
     always @(posedge clk) begin
         if (rst) begin
             cycle_count = 0;
+            retired_instruction_count = 0;
+            finish_cycle = -1;
+            finish_retired_instruction_count = -1;
             sort_done_reported = 0;
+            retire_valid_d1 = 0;
+            retire_valid_d2 = 0;
         end else begin
             cycle_count = cycle_count + 1;
+
+            if (retire_valid_d2)
+                retired_instruction_count = retired_instruction_count + 1;
+
+            retire_valid_d2 = retire_valid_d1;
+            retire_valid_d1 = execute_instruction_valid;
+
             if (cpu_inst.registers.registers[20] == 32'd1 && !sort_done_reported) begin
                 sort_done_reported = 1;
+                finish_cycle = cycle_count;
+                finish_retired_instruction_count = retired_instruction_count;
                 $display("Sort finished after %0d clock cycles", cycle_count);
+                $display("Retired instructions at sort completion: %0d",
+                         retired_instruction_count);
+                $display("IPC at sort completion: %0.6f",
+                         $itor(retired_instruction_count) / $itor(cycle_count));
             end
         end
     end
@@ -142,6 +177,15 @@ module cpu_bubble_sort_tb;
             $display("Sort completion not observed before timeout (x20 = %0d)",
                      cpu_inst.registers.registers[20]);
         $display("Total clock cycles after reset deassert: %0d", cycle_count);
+        $display("Total retired instructions after reset deassert: %0d",
+                 retired_instruction_count);
+        if (finish_cycle >= 0) begin
+            $display("Clock cycles at sort completion: %0d", finish_cycle);
+            $display("Retired instructions at sort completion: %0d",
+                     finish_retired_instruction_count);
+            $display("IPC at sort completion: %0.6f",
+                     $itor(finish_retired_instruction_count) / $itor(finish_cycle));
+        end
         $display("Total branches: %0d", cpu_inst.branch_predictor.total_branches_counter);
         $display("Branch direction misses: %0d", cpu_inst.branch_predictor.predictor_miss_counter);
         $display("Branch target misses: %0d", cpu_inst.branch_predictor.predictor_target_miss_counter);
